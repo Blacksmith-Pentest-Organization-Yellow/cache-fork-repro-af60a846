@@ -1,0 +1,40 @@
+name: Fork cache branch canary
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: save or restore
+        required: true
+        type: choice
+        options:
+          - save
+          - restore
+  pull_request:
+    branches: [main]
+jobs:
+  cache-canary:
+    runs-on: blacksmith-staging-2vcpu-ubuntu-2404
+    steps:
+      - name: Write base branch marker
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.operation == 'save' && github.ref == 'refs/heads/canary-5d0efada' }}
+        run: |
+          mkdir -p cache-proof-9d4125b7
+          printf '%s\n' 'BASE_BRANCH_CANARY_31b9ca9f9941e750' > cache-proof-9d4125b7/marker.txt
+      - name: Save exact key
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.operation == 'save' && github.ref == 'refs/heads/canary-5d0efada' }}
+        uses: actions/cache/save@v4
+        with:
+          key: repro-cache-6fe4f7548a18b43d
+          path: cache-proof-9d4125b7/marker.txt
+      - name: Restore exact key
+        id: restore
+        if: ${{ github.event_name == 'pull_request' || inputs.operation == 'restore' }}
+        uses: actions/cache/restore@v4
+        with:
+          key: repro-cache-6fe4f7548a18b43d
+          path: cache-proof-9d4125b7/marker.txt
+      - name: Report cache result
+        if: ${{ github.event_name == 'pull_request' || inputs.operation == 'restore' }}
+        run: |
+          echo "CACHE_HIT=${{ steps.restore.outputs.cache-hit }}"
+          if test -f cache-proof-9d4125b7/marker.txt; then cat cache-proof-9d4125b7/marker.txt; else echo CACHE_MISS; fi
